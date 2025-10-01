@@ -3,6 +3,16 @@ const ALLOW_PAGE_TRANSLATION = 1;
 if (ALLOW_PAGE_TRANSLATION == 0) {
     console.warn("ページ遷移オフ");
 }
+
+// フォールバック用の初期値設定（background.jsで設定されない場合のため）
+chrome.storage.local.get(['gas_url'], function(result) {
+    if (!result.gas_url) {
+        chrome.storage.local.set({
+            gas_url: "https://script.google.com/macros/s/AKfycbziaa5KikZ2Ez8NgU4a3H2vvCoeSEG5SJwZ3k0V6smUsQDcvD8k4Do_R7kJwY4vi8EhAA/exec"
+        });
+    }
+});
+
 chrome.storage.local.get(null, function (storageData) {
     console.debug(JSON.stringify(storageData));
     if (storageData.id == null && document.body.className != "page-login") {
@@ -91,7 +101,6 @@ chrome.storage.local.get(null, function (storageData) {
                 }
                 let answerDelayMs = Number(document.getElementById("slider_late").value) * 1000;
                 let setScore = 0;
-                let dummy = "";
                 let selectedUnits = [];
                 document.querySelectorAll("input[name=\"unit_selection\"]").forEach(checkbox => {
                     if (checkbox.checked) {
@@ -116,10 +125,22 @@ chrome.storage.local.get(null, function (storageData) {
                     set_score: setScore,
                     set_late: answerDelayMs,
                     set_wrong_question: questionsToFail,
-                    set_run_unit: selectedUnits
+                    set_run_unit: selectedUnits,
+                    gas_url: document.getElementById("gas_url").value
                 }, function () { });
             }
-            document.getElementsByClassName("body")[0].innerHTML = "<form action='/user/seibido/' method='POST'><input type='hidden' name='login' value='login'><div class='login-error-block'></div><div class='input-with-icon login-input-text'><i class='las la-smile'></i><input type='text' name='id' autocomplete='username' placeholder='User ID'></div><div class='input-with-icon login-input-text'><i class='las la-key'></i><div class='password-wrapper'><input type='password' name='password' autocomplete='current-password' placeholder='Password'><button class='button button-trans passwdViewBtn' type='button'>表示</button></div></div><script>makePasswordVisible(document.querySelector('input[type=password]'));</script><div class='login-optx '><a href='resetpw.php'>パスワードを忘れた方&nbsp;<i class='las la-arrow-right'></i></a><a href='https://www.seibido.co.jp/linguaporta/register.html' target='_blank'>リンガポルタの使い方&nbsp;<i class='las la-arrow-right'></i></a></div><div class='center_RL'><label for='switch' class='switch_label'><div class='switch'><input type='checkbox' id='switch' checked /><div class='circle'></div> <div class='base'></div></div><span class='current-status'>OFF</span></label></div><div class='stats-pannel ranking'><div class='title'>SETTINGS</div><div class='body'><table id='table_setting' class='table_original'><tbody><tr id='tr_setting_score'><th style='width:7em;'>獲得するスコア</th><td id='current-value_score' class='current-value' style='width:3em; border-right:none;'></td><td><input type='range' id='slider_score' min='25' max='300' step='25' value='100' style='width:100%' title='自動実行で獲得するスコアを選択します'></td></tr><tr id='tr_setting_late'><th>回答入力遅延</th><td id='current-value_late' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_late' min='0' max='20' step='1' value='8' style='width:100%' title='回答入力時の遅延を選択します(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr id='tr_setting_rate'><th>正答率</th><td id='current-value_correct_answer_rate' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_correct_answer_rate' min='50' max='125' step='1' value='115' style='width:100%' title='正答率を選択します(サーバー上に答えがない場合は50%になります)(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr><th>単元</th><td colspan='2' style='text-align:left !important;'><label><input type='checkbox' id='unit_selection_0' name='unit_selection' value='単語の意味' title='単語の意味' checked>単語の意味</label><label><input type='checkbox' id='unit_selection_1' name='unit_selection' value='空所補充' title='空所補充' checked>空所補充</label></td></tr></tbody></table></div></div><div class='login-btn'><button type='submit' value='LOGIN' class='button button-secondary button-big'>スタート</button></div></form> <a href='https://github.com/Raptor-zip/LINGUAPORTA/' class='bookmark source'><div class='bookmark-info'><div class='bookmark-text'><div class='bookmark-title'>《使い方》リンガポルタ自動化ツール</div></div><div class='bookmark-href'><img src='https://github.com/fluidicon.png' class='icon bookmark-icon'>https://github.com/Raptor-zip/LINGUAPORTA/</div></div></a>";
+            document.getElementsByClassName("body")[0].innerHTML = "<form action='/user/seibido/' method='POST'><input type='hidden' name='login' value='login'><div class='login-error-block'></div><div class='input-with-icon login-input-text'><i class='las la-smile'></i><input type='text' name='id' autocomplete='username' placeholder='User ID'></div><div class='input-with-icon login-input-text'><i class='las la-key'></i><div class='password-wrapper'><input type='password' name='password' autocomplete='current-password' placeholder='Password'><button class='button button-trans passwdViewBtn' type='button'>表示</button></div></div><script>makePasswordVisible(document.querySelector('input[type=password]'));</script><div class='login-optx '><a href='resetpw.php'>パスワードを忘れた方&nbsp;<i class='las la-arrow-right'></i></a><a href='https://www.seibido.co.jp/linguaporta/register.html' target='_blank'>リンガポルタの使い方&nbsp;<i class='las la-arrow-right'></i></a></div><div class='center_RL'><label for='switch' class='switch_label'><div class='switch'><input type='checkbox' id='switch' checked /><div class='circle'></div> <div class='base'></div></div><span class='current-status'>OFF</span></label></div><div class='stats-pannel ranking'><div class='title'>SETTINGS</div><div class='body'><div class='tab-container'><div class='tab-buttons'><button type='button' class='tab-button active' data-tab='basic'>基本設定</button><button type='button' class='tab-button' data-tab='advanced'>詳細設定</button></div><div class='tab-content' id='basic-tab'><table id='table_setting' class='table_original'><tbody><tr id='tr_setting_score'><th style='width:7em;'>獲得するスコア</th><td id='current-value_score' class='current-value' style='width:3em; border-right:none;'></td><td><input type='range' id='slider_score' min='25' max='1500' step='25' value='100' style='width:100%' title='自動実行で獲得するスコアを選択します'></td></tr><tr id='tr_setting_late'><th>回答入力遅延</th><td id='current-value_late' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_late' min='0' max='20' step='1' value='8' style='width:100%' title='回答入力時の遅延を選択します(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr id='tr_setting_rate'><th>正答率</th><td id='current-value_correct_answer_rate' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_correct_answer_rate' min='50' max='125' step='1' value='115' style='width:100%' title='正答率を選択します(サーバー上に答えがない場合は50%になります)(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr><th>単元</th><td colspan='2' style='text-align:left !important;'><label><input type='checkbox' id='unit_selection_0' name='unit_selection' value='単語の意味' title='単語の意味' checked>単語の意味</label><label><input type='checkbox' id='unit_selection_1' name='unit_selection' value='空所補充' title='空所補充' checked>空所補充</label></td></tr></tbody></table></div><div class='tab-content' id='advanced-tab' style='display:none;'><table class='table_original'><tbody><tr><th style='width:7em; color:#333 !important;'>GAS URL</th><td colspan='2'><input type='url' id='gas_url' placeholder='https://script.google.com/macros/s/.../exec' style='width:100%; padding:5px; border:1px solid #ccc; border-radius:3px; color:#333 !important;' title='Google Apps ScriptのWebアプリURLを入力してください'></td></tr><tr><td colspan='3' style='padding:10px; color:#666; font-size:12px; line-height:1.4;'>※ Google Apps ScriptのWebアプリURLを入力してください。<br>デフォルト値が設定されているため、通常は変更不要です。</td></tr></tbody></table></div></div></div></div><div class='login-btn'><button type='submit' value='LOGIN' class='button button-secondary button-big'>スタート</button></div></form><style>.tab-container{margin-top:10px;}.tab-buttons{display:flex;border-bottom:1px solid #ccc;margin-bottom:10px;}.tab-button{flex:1;padding:10px 16px;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;font-size:14px;color:#333 !important;transition:all 0.3s;}.tab-button:hover{background:#f5f5f5;color:#007cba !important;}.tab-button.active{border-bottom-color:#007cba;color:#007cba !important;background:#fff;}.tab-content{min-height:150px;padding:10px 0;color:#333 !important;}.tab-content table th{color:#333 !important;}.tab-content table td{color:#333 !important;}</style> <a href='https://github.com/Raptor-zip/LINGUAPORTA/' class='bookmark source'><div class='bookmark-info'><div class='bookmark-text'><div class='bookmark-title'>《使い方》リンガポルタ自動化ツール</div></div><div class='bookmark-href'><img src='https://github.com/fluidicon.png' class='icon bookmark-icon'>https://github.com/Raptor-zip/LINGUAPORTA/</div></div></a>";
+            // タブ機能の初期化
+            setTimeout(function() {
+                document.querySelectorAll('.tab-button').forEach(button => {
+                    button.addEventListener('click', function() {
+                        document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                        document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+                        this.classList.add('active');
+                        document.getElementById(this.dataset.tab + '-tab').style.display = 'block';
+                    });
+                });
+            }, 100);
             if (storageData.id != null) {
                 document.getElementsByName("id")[0].value = storageData.id;
             }
@@ -138,8 +159,11 @@ chrome.storage.local.get(null, function (storageData) {
                 console.log("configured_rate", storageData.configured_rate);
                 document.getElementById("slider_correct_answer_rate").value = Math.round(storageData.learning_time * 10 / storageData.score) / 10 + "秒";
             }
+            if (storageData.gas_url != null) {
+                document.getElementById("gas_url").value = storageData.gas_url;
+            }
             updateLoginSettings();
-            const settingElements = Object.freeze(["slider_score", "slider_late", "slider_correct_answer_rate", "unit_selection_0", "unit_selection_1", "switch"]);
+            const settingElements = Object.freeze(["slider_score", "slider_late", "slider_correct_answer_rate", "unit_selection_0", "unit_selection_1", "switch", "gas_url"]);
             for (let i = 0; i < settingElements.length; i++) {
                 document.getElementById(settingElements[i]).addEventListener("change", updateLoginSettings);
             }
@@ -221,7 +245,6 @@ chrome.storage.local.get(null, function (storageData) {
                                 }
                                 const unitName = unitInfo.unit_name.split(")")[1];
                                 const message = {
-                                    id: storageData.id,
                                     request_type: "get",
                                     question_number: questionNumberList
                                 };
@@ -241,6 +264,7 @@ chrome.storage.local.get(null, function (storageData) {
                                             wrong_question_queue: storageData.set_wrong_question,
                                             score_per_mode: updatedScorePerMode
                                         };
+                                        console.log(response)
                                         response.content.forEach((questionData, index) => {
                                             newStorageData["a" + questionData[0]] = questionData.slice(1, 6);
                                         });
@@ -366,7 +390,6 @@ chrome.storage.local.get(null, function (storageData) {
                             let newQueue = storageData.GAS_set_queue;
                             newQueue.push(thisQuestionInfo);
                             const message = {
-                                id: storageData.id,
                                 request_type: "set",
                                 content: newQueue
                             };
@@ -485,7 +508,6 @@ chrome.storage.local.get(null, function (storageData) {
                             let newQueue = storageData.GAS_set_queue;
                             newQueue.push(thisQuestionInfo2);
                             const message = {
-                                id: storageData.id,
                                 request_type: "set",
                                 content: newQueue
                             };
@@ -521,10 +543,10 @@ chrome.storage.local.get(null, function (storageData) {
             console.error("エラー");
             console.debug(document.querySelector("html").innerText);
     }
-    
+
     function cleanupStorage() {
         for (let key in storageData) {
-            const persistentKeys = Object.freeze(["id", "password", "set_score", "set_late", "set_wrong_question", "set_run_unit", "score", "rank", "challenge_times", "learning_time", "wrong_question_queue", "score_per_mode"]);
+            const persistentKeys = Object.freeze(["id", "password", "set_score", "set_late", "set_wrong_question", "set_run_unit", "score", "rank", "challenge_times", "learning_time", "wrong_question_queue", "score_per_mode", "gas_url"]);
             if (!persistentKeys.includes(key)) {
                 chrome.storage.local.remove(key);
             }
