@@ -273,15 +273,37 @@ chrome.storage.local.get(null, function (storageData) {
             break;
         case "学習結果表示画面":
             console.debug("location:" + currentPage);
-            if (storageData.set_score > 0) {
-                if (ALLOW_PAGE_TRANSLATION) {
-                    document.querySelector("#spmenu-nav > a:nth-child(1)").click();
-                }
-            } else if (storageData.set_score == 0) {
-                performLogout();
-            } else if (storageData.set_score != -2) {
-                console.error("エラー");
+            let learningTimeParts = [];
+            for (let i = 1; i < 4; i++) {
+                learningTimeParts.push(document.querySelector("body > div > main > section.stats-pannel.portfolio > div.body > div:nth-child(4) > div > span:nth-child(" + i + ")").innerText);
             }
+            const learningResultSummary = {
+                score: Number(document.getElementsByClassName("xl")[0]),
+                challenge_times: Number(document.getElementsByClassName("portfolio-number")[2].innerText.slice(0, -2)),
+                learning_time: Number(learningTimeParts[0]) * 60 * 60 + Number(learningTimeParts[1]) * 60 + Number(learningTimeParts[2])
+            };
+            chrome.storage.local.set(learningResultSummary, function () {
+                const portfolioMessage = {
+                    id: storageData.id,
+                    request_type: "portfolio_record",
+                    score: learningResultSummary.score,
+                    rank: storageData.rank,
+                    challenge_times: learningResultSummary.challenge_times,
+                    learning_time: learningResultSummary.learning_time
+                };
+                chrome.runtime.sendMessage(portfolioMessage, response => {
+                    console.debug(JSON.stringify(response));
+                    if (storageData.set_score > 0) {
+                        if (ALLOW_PAGE_TRANSLATION) {
+                            document.querySelector("#spmenu-nav > a:nth-child(1)").click();
+                        }
+                    } else if (storageData.set_score == 0) {
+                        performLogout();
+                    } else if (storageData.set_score != -2) {
+                        console.error("エラー");
+                    }
+                });
+            });
             break;
         case "空所補充-問題出題画面":
             console.debug("location:" + currentPage);
@@ -521,7 +543,6 @@ chrome.storage.local.get(null, function (storageData) {
             console.error("エラー");
             console.debug(document.querySelector("html").innerText);
     }
-    
     function cleanupStorage() {
         for (let key in storageData) {
             const persistentKeys = Object.freeze(["id", "password", "set_score", "set_late", "set_wrong_question", "set_run_unit", "score", "rank", "challenge_times", "learning_time", "wrong_question_queue", "score_per_mode"]);
@@ -530,7 +551,6 @@ chrome.storage.local.get(null, function (storageData) {
             }
         }
     }
-
     async function performLogout() {
         if (ALLOW_PAGE_TRANSLATION) {
             const logoutUrl = "";
@@ -549,7 +569,6 @@ chrome.storage.local.get(null, function (storageData) {
             location.reload();
         }
     }
-
     function generateRandomString() {
         const characters = "abcdefghijklmnopqrstuvwxyz";
         let result = "";
@@ -558,7 +577,6 @@ chrome.storage.local.get(null, function (storageData) {
         }
         return result;
     }
-
     function submitAnswer() {
         setTimeout(() => {
             if (ALLOW_PAGE_TRANSLATION) {
@@ -566,33 +584,87 @@ chrome.storage.local.get(null, function (storageData) {
             }
         }, storageData.set_late);
     }
-
     function sendResultData() {
-        if (storageData.set_score > -2) {
-            if ("set_score" in storageData) {
-                chrome.storage.local.set({
-                    configured_score: storageData.set_score,
-                    configured_late: storageData.set_late,
-                    configured_rate: storageData.set_wrong_question.length,
-                    set_score: storageData.set_score - 25
-                }, function () {
-                    if (ALLOW_PAGE_TRANSLATION) {
-                        document.getElementsByClassName("return-links _bottom")[0].children[0].click();
-                    }
-                });
-            } else {
-                const newConfig = {
-                    configured_score: storageData.set_score,
-                    configured_late: storageData.set_late,
-                    configured_rate: storageData.set_wrong_question.length,
-                    set_score: 0
-                };
-                chrome.storage.local.set(newConfig, function () {
-                    if (ALLOW_PAGE_TRANSLATION) {
-                        document.getElementsByClassName("return-links _bottom")[0].children[0].click();
-                    }
-                });
-            }
+        const userAgent = window.navigator.userAgent.toLowerCase();
+        let browserName = "";
+        if (userAgent.indexOf("edge") !== -1 || userAgent.indexOf("edga") !== -1 || userAgent.indexOf("edgios") !== -1) {
+            browserName = "Edge";
+        } else if (userAgent.indexOf("opera") !== -1 || userAgent.indexOf("opr") !== -1) {
+            browserName = "Opera";
+        } else if (userAgent.indexOf("samsungbrowser") !== -1) {
+            browserName = "Samsung Internet Browser";
+        } else if (userAgent.indexOf("ucbrowser") !== -1) {
+            browserName = "UC";
+        } else if (userAgent.indexOf("chrome") !== -1 || userAgent.indexOf("crios") !== -1) {
+            browserName = "Chrome";
+        } else if (userAgent.indexOf("firefox") !== -1 || userAgent.indexOf("fxios") !== -1) {
+            browserName = "Firefox";
+        } else if (userAgent.indexOf("safari") !== -1) {
+            browserName = "Safari";
+        } else if (userAgent.indexOf("msie") !== -1 || userAgent.indexOf("trident") !== -1) {
+            browserName = "IE";
+        } else {
+            browserName = "error";
         }
+        let osName = "";
+        if (userAgent.indexOf("windows nt") !== -1) {
+            osName = "Windows";
+        } else if (userAgent.indexOf("android") !== -1) {
+            osName = "Android";
+        } else if (userAgent.indexOf("iphone") !== -1 || userAgent.indexOf("ipad") !== -1) {
+            osName = "iOS";
+        } else if (userAgent.indexOf("mac os x") !== -1) {
+            osName = "Mac";
+        } else {
+            osName = "error";
+        }
+        chrome.runtime.sendMessage({
+            id: storageData.id,
+            request_type: "result_setting_record",
+            version: chrome.runtime.getManifest().version,
+            set_score: storageData.set_score,
+            set_late: storageData.set_late / 1000,
+            set_wrong_question: storageData["set_wrong_question.length"],
+            set_run_unit: storageData.set_run_unit.join(),
+            run_unit: questionType,
+            run_question_number: storageData.start_question_number,
+            get_score: storageData.correct_answer_times + 1,
+            incorrect_answer_times: storageData.incorrect_answer_times,
+            duration: Math.round((Date.now() - storageData.start_time) / 1000),
+            browser: browserName,
+            os: osName,
+            user_agent: userAgent,
+            screen_width: screen.width,
+            screen_height: screen.height
+        }, response => {
+            console.debug(JSON.stringify(response));
+            if (storageData.set_score > -2) {
+                if ("set_score" in storageData) {
+                    chrome.storage.local.set({
+                        configured_score: storageData.set_score,
+                        configured_late: storageData.set_late,
+                        configured_rate: storageData.set_wrong_question.length,
+                        set_score: storageData.set_score - 25
+                    }, function () {
+                        if (ALLOW_PAGE_TRANSLATION) {
+                            document.getElementsByClassName("return-links _bottom")[0].children[0].click();
+                        }
+                    });
+                } else {
+                    const newConfig = {
+                        configured_score: storageData.set_score,
+                        configured_late: storageData.set_late,
+                        configured_rate: storageData.set_wrong_question.length,
+                        set_score: 0
+                    };
+                    chrome.storage.local.set(newConfig, function () {
+                        if (ALLOW_PAGE_TRANSLATION) {
+                            document.getElementsByClassName("return-links _bottom")[0].children[0].click();
+                        }
+                    });
+                    console.error("エラー");
+                }
+            }
+        });
     }
 });
