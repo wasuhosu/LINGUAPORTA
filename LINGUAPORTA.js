@@ -5,42 +5,28 @@ if (ALLOW_PAGE_TRANSLATION == 0) {
 }
 
 // フォールバック用の初期値設定（background.jsで設定されない場合のため）
+// 拡張機能の初回インストール時やストレージが空の場合にデフォルトのGAS URLを設定
 chrome.storage.local.get(['gas_url'], function(result) {
     if (!result.gas_url) {
         chrome.storage.local.set({
-            gas_url: "https://script.google.com/macros/s/AKfycbziaa5KikZ2Ez8NgU4a3H2vvCoeSEG5SJwZ3k0V6smUsQDcvD8k4Do_R7kJwY4vi8EhAA/exec"
+            gas_url: "https://script.google.com/macros/s/AKfycbxt1PoqleHz83NdYUjeLrMSkp0zbQaOCfq4QOemdjKoCiiVzQiuOhkj0OeoSKul4PP_yg/exec"
         });
     }
 });
 
-chrome.storage.local.get(null, function (storageData) {
-    console.debug(JSON.stringify(storageData));
-    if (storageData.id == null && document.body.className != "page-login") {
-        console.error("idが設定されていません");
-        performLogout();
-    }
+// 現在のページを特定する関数
+// リンガポルタのページ状態を判定し、適切な自動化処理を行うために使用
+function getCurrentPageInfo() {
     let currentPage = "";
-    let questionNumber = 0;
-    if (document.getElementsByClassName("problem-title")[0] != null && document.getElementsByClassName("page-title")[0].children[0] != null) {
-        questionNumber = document.getElementsByClassName("problem-title")[0].innerText.split("：")[1] - 1 + Number(document.getElementsByClassName("page-title")[0].children[0].innerText.split(")")[0].slice(1).split("-")[0]);
-    }
-    let currentScore = 0;
-    if (document.getElementsByClassName("score-number")[1] != null) {
-        currentScore = Number(document.getElementsByClassName("score-number")[1].innerText);
-    }
     let questionType = "";
-    let questionNumberList = [];
-    let answerText1 = "";
-    let answerText2 = "";
-    let answerData = "";
-    if (document.getElementById("question_td") != null) {
-        document.getElementById("question_td").innerHTML = document.getElementById("question_td").innerHTML.replace(/<br>/g, "");
-    }
+    
+    // ページタイトルから問題の種類（空所補充 or 単語の意味）を判定
     if (document.body.className == "page-problem") {
         questionType = document.getElementsByClassName("page-title")[0].children[0].innerText.split(")")[1];
     } else {
         questionType = "一覧";
     }
+    
     if (document.body.className == "page-login") {
         currentPage = "ログイン画面";
     } else if (document.body.className == "page-home") {
@@ -80,10 +66,49 @@ chrome.storage.local.get(null, function (storageData) {
             currentPage = "不明";
             console.error("ページの特定に失敗");
         }
-    } else if (document.querySelector("#problem-area").innerText == "問題が有りません。") {
+    } else if (document.querySelector("#problem-area") && document.querySelector("#problem-area").innerText == "問題が有りません。") {
         currentPage = "全問題終了画面で再読み込み";
     } else {
         console.error("ページの特定に失敗");
+    }
+    
+    return {
+        currentPage: currentPage,
+        questionType: questionType
+    };
+}
+
+chrome.storage.local.get(null, function (storageData) {
+    console.debug(JSON.stringify(storageData));
+    if (storageData.id == null && document.body.className != "page-login") {
+        console.error("idが設定されていません");
+        performLogout();
+    }
+    console.log(storageData.wrong_question_queue)
+    // ページ情報を取得
+    const pageInfo = getCurrentPageInfo();
+    let currentPage = pageInfo.currentPage;
+    let questionType = pageInfo.questionType;
+    
+    // 現在の問題番号を計算（複雑な計算式のため詳細説明）
+    let questionNumber = 0;
+    if (document.getElementsByClassName("problem-title")[0] != null && document.getElementsByClassName("page-title")[0].children[0] != null) {
+        // 問題タイトル「問題：2」から「2」を抽出し、-1してインデックス化
+        // ページタイトル「(1-25)空所補充」から「1」を抽出し、開始番号として加算
+        // 結果：実際の問題番号 = (画面上の問題番号 - 1) + 単元開始番号
+        questionNumber = document.getElementsByClassName("problem-title")[0].innerText.split("：")[1] - 1 + Number(document.getElementsByClassName("page-title")[0].children[0].innerText.split(")")[0].slice(1).split("-")[0]);
+        console.log("questionNumber", questionNumber);
+    }
+    let currentScore = 0;
+    if (document.getElementsByClassName("score-number")[1] != null) {
+        currentScore = Number(document.getElementsByClassName("score-number")[1].innerText);
+    }
+    let questionNumberList = [];
+    let answerText1 = "";
+    let answerText2 = "";
+    let answerData = "";
+    if (document.getElementById("question_td") != null) {
+        document.getElementById("question_td").innerHTML = document.getElementById("question_td").innerHTML.replace(/<br>/g, "");
     }
     switch (currentPage) {
         case "ログイン画面":
@@ -91,13 +116,15 @@ chrome.storage.local.get(null, function (storageData) {
             function updateLoginSettings() {
                 document.getElementById("current-value_late").innerText = document.getElementById("slider_late").value + "秒";
                 document.getElementById("current-value_score").innerText = document.getElementById("slider_score").value + "点";
-                document.getElementById("current-value_correct_answer_rate").innerText = Math.round(25 / (150 - document.getElementById("slider_correct_answer_rate").value) * 100) + "%";
+                document.getElementById("current-value_correct_answer_rate").innerText = document.getElementById("slider_correct_answer_rate").value + "%";
                 let questionsToFail = [];
-                for (let i = 0; i < Math.floor((125 - document.getElementById("slider_correct_answer_rate").value) / 25); i++) {
-                    questionsToFail.push(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25);
-                }
-                for (let j = 1; j <= Math.floor((125 - document.getElementById("slider_correct_answer_rate").value) % 25); j++) {
-                    questionsToFail.push(j);
+                let correctRate = Number(document.getElementById("slider_correct_answer_rate").value);
+                let incorrectRate = 100 - correctRate;
+                // 25問中の不正解数を計算
+                let incorrectCount = Math.round(25 * incorrectRate / 100);
+                // 不正解にする問題番号をランダムに選択
+                for (let i = 1; i <= incorrectCount; i++) {
+                    questionsToFail.push(i);
                 }
                 let answerDelayMs = Number(document.getElementById("slider_late").value) * 1000;
                 let setScore = 0;
@@ -119,17 +146,20 @@ chrome.storage.local.get(null, function (storageData) {
                     questionsToFail = null;
                     selectedUnits = null;
                 }
+                // ユーザー設定をChromeストレージに保存
                 chrome.storage.local.set({
-                    id: document.getElementsByName("id")[0].value,
-                    password: document.getElementsByName("password")[0].value,
-                    set_score: setScore,
-                    set_late: answerDelayMs,
-                    set_wrong_question: questionsToFail,
-                    set_run_unit: selectedUnits,
-                    gas_url: document.getElementById("gas_url").value
+                    id: document.getElementsByName("id")[0].value,        // ログインID
+                    password: document.getElementsByName("password")[0].value, // パスワード
+                    set_score: setScore,                                   // 目標獲得スコア(-2=自動化OFF, 0=停止, >0=継続)
+                    set_late: answerDelayMs,                              // 回答遅延時間(ミリ秒)
+                    set_wrong_question: questionsToFail,                  // 意図的に間違える問題番号の配列
+                    set_run_unit: selectedUnits,                          // 学習対象の単元名配列
+                    gas_url: document.getElementById("gas_url").value      // Google Apps ScriptのURL
                 }, function () { });
             }
-            document.getElementsByClassName("body")[0].innerHTML = "<form action='/user/seibido/' method='POST'><input type='hidden' name='login' value='login'><div class='login-error-block'></div><div class='input-with-icon login-input-text'><i class='las la-smile'></i><input type='text' name='id' autocomplete='username' placeholder='User ID'></div><div class='input-with-icon login-input-text'><i class='las la-key'></i><div class='password-wrapper'><input type='password' name='password' autocomplete='current-password' placeholder='Password'><button class='button button-trans passwdViewBtn' type='button'>表示</button></div></div><script>makePasswordVisible(document.querySelector('input[type=password]'));</script><div class='login-optx '><a href='resetpw.php'>パスワードを忘れた方&nbsp;<i class='las la-arrow-right'></i></a><a href='https://www.seibido.co.jp/linguaporta/register.html' target='_blank'>リンガポルタの使い方&nbsp;<i class='las la-arrow-right'></i></a></div><div class='center_RL'><label for='switch' class='switch_label'><div class='switch'><input type='checkbox' id='switch' checked /><div class='circle'></div> <div class='base'></div></div><span class='current-status'>OFF</span></label></div><div class='stats-pannel ranking'><div class='title'>SETTINGS</div><div class='body'><div class='tab-container'><div class='tab-buttons'><button type='button' class='tab-button active' data-tab='basic'>基本設定</button><button type='button' class='tab-button' data-tab='advanced'>詳細設定</button></div><div class='tab-content' id='basic-tab'><table id='table_setting' class='table_original'><tbody><tr id='tr_setting_score'><th style='width:7em;'>獲得するスコア</th><td id='current-value_score' class='current-value' style='width:3em; border-right:none;'></td><td><input type='range' id='slider_score' min='25' max='1500' step='25' value='100' style='width:100%' title='自動実行で獲得するスコアを選択します'></td></tr><tr id='tr_setting_late'><th>回答入力遅延</th><td id='current-value_late' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_late' min='0' max='20' step='1' value='8' style='width:100%' title='回答入力時の遅延を選択します(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr id='tr_setting_rate'><th>正答率</th><td id='current-value_correct_answer_rate' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_correct_answer_rate' min='50' max='125' step='1' value='115' style='width:100%' title='正答率を選択します(サーバー上に答えがない場合は50%になります)(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr><th>単元</th><td colspan='2' style='text-align:left !important;'><label><input type='checkbox' id='unit_selection_0' name='unit_selection' value='単語の意味' title='単語の意味' checked>単語の意味</label><label><input type='checkbox' id='unit_selection_1' name='unit_selection' value='空所補充' title='空所補充' checked>空所補充</label></td></tr></tbody></table></div><div class='tab-content' id='advanced-tab' style='display:none;'><table class='table_original'><tbody><tr><th style='width:7em; color:#333 !important;'>GAS URL</th><td colspan='2'><input type='url' id='gas_url' placeholder='https://script.google.com/macros/s/.../exec' style='width:100%; padding:5px; border:1px solid #ccc; border-radius:3px; color:#333 !important;' title='Google Apps ScriptのWebアプリURLを入力してください'></td></tr><tr><td colspan='3' style='padding:10px; color:#666; font-size:12px; line-height:1.4;'>※ Google Apps ScriptのWebアプリURLを入力してください。<br>デフォルト値が設定されているため、通常は変更不要です。</td></tr></tbody></table></div></div></div></div><div class='login-btn'><button type='submit' value='LOGIN' class='button button-secondary button-big'>スタート</button></div></form><style>.tab-container{margin-top:10px;}.tab-buttons{display:flex;border-bottom:1px solid #ccc;margin-bottom:10px;}.tab-button{flex:1;padding:10px 16px;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;font-size:14px;color:#333 !important;transition:all 0.3s;}.tab-button:hover{background:#f5f5f5;color:#007cba !important;}.tab-button.active{border-bottom-color:#007cba;color:#007cba !important;background:#fff;}.tab-content{min-height:150px;padding:10px 0;color:#333 !important;}.tab-content table th{color:#333 !important;}.tab-content table td{color:#333 !important;}</style> <a href='https://github.com/Raptor-zip/LINGUAPORTA/' class='bookmark source'><div class='bookmark-info'><div class='bookmark-text'><div class='bookmark-title'>《使い方》リンガポルタ自動化ツール</div></div><div class='bookmark-href'><img src='https://github.com/fluidicon.png' class='icon bookmark-icon'>https://github.com/Raptor-zip/LINGUAPORTA/</div></div></a>";
+            // ログイン画面に自動化設定UIを埋め込み
+            // 元のログインフォームを拡張して、自動化ON/OFF、スコア設定、遅延設定、正答率設定、単元選択を追加
+            document.getElementsByClassName("body")[0].innerHTML = "<form action='/user/seibido/' method='POST'><input type='hidden' name='login' value='login'><div class='login-error-block'></div><div class='input-with-icon login-input-text'><i class='las la-smile'></i><input type='text' name='id' autocomplete='username' placeholder='User ID'></div><div class='input-with-icon login-input-text'><i class='las la-key'></i><div class='password-wrapper'><input type='password' name='password' autocomplete='current-password' placeholder='Password'><button class='button button-trans passwdViewBtn' type='button'>表示</button></div></div><script>makePasswordVisible(document.querySelector('input[type=password]'));</script><div class='login-optx '><a href='resetpw.php'>パスワードを忘れた方&nbsp;<i class='las la-arrow-right'></i></a><a href='https://www.seibido.co.jp/linguaporta/register.html' target='_blank'>リンガポルタの使い方&nbsp;<i class='las la-arrow-right'></i></a></div><div class='center_RL'><label for='switch' class='switch_label'><div class='switch'><input type='checkbox' id='switch' checked /><div class='circle'></div> <div class='base'></div></div><span class='current-status'>OFF</span></label></div><div class='stats-pannel ranking'><div class='title'>SETTINGS</div><div class='body'><div class='tab-container'><div class='tab-buttons'><button type='button' class='tab-button active' data-tab='basic'>基本設定</button><button type='button' class='tab-button' data-tab='advanced'>詳細設定</button></div><div class='tab-content' id='basic-tab'><table id='table_setting' class='table_original'><tbody><tr id='tr_setting_score'><th style='width:7em;'>獲得するスコア</th><td id='current-value_score' class='current-value' style='width:3em; border-right:none;'></td><td><input type='range' id='slider_score' min='25' max='1500' step='25' value='100' style='width:100%' title='自動実行で獲得するスコアを選択します'></td></tr><tr id='tr_setting_late'><th>回答入力遅延</th><td id='current-value_late' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_late' min='0' max='20' step='1' value='8' style='width:100%' title='回答入力時の遅延を選択します(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr id='tr_setting_rate'><th>正答率</th><td id='current-value_correct_answer_rate' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_correct_answer_rate' min='0' max='100' step='1' value='80' style='width:100%' title='正答率を選択します(0-100%)(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr><th>単元</th><td colspan='2' style='text-align:left !important;'><label><input type='checkbox' id='unit_selection_0' name='unit_selection' value='単語の意味' title='単語の意味' checked>単語の意味</label><label><input type='checkbox' id='unit_selection_1' name='unit_selection' value='空所補充' title='空所補充' checked>空所補充</label></td></tr></tbody></table></div><div class='tab-content' id='advanced-tab' style='display:none;'><table class='table_original'><tbody><tr><th style='width:7em; color:#333 !important;'>GAS URL</th><td colspan='2'><input type='url' id='gas_url' placeholder='https://script.google.com/macros/s/.../exec' style='width:100%; padding:5px; border:1px solid #ccc; border-radius:3px; color:#333 !important;' title='Google Apps ScriptのWebアプリURLを入力してください'></td></tr><tr><td colspan='3' style='padding:10px; color:#666; font-size:12px; line-height:1.4;'>※ Google Apps ScriptのWebアプリURLを入力してください。<br>デフォルト値が設定されているため、通常は変更不要です。</td></tr></tbody></table></div></div></div></div><div class='login-btn'><button type='submit' value='LOGIN' class='button button-secondary button-big'>スタート</button></div></form><style>.tab-container{margin-top:10px;}.tab-buttons{display:flex;border-bottom:1px solid #ccc;margin-bottom:10px;}.tab-button{flex:1;padding:10px 16px;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;font-size:14px;color:#333 !important;transition:all 0.3s;}.tab-button:hover{background:#f5f5f5;color:#007cba !important;}.tab-button.active{border-bottom-color:#007cba;color:#007cba !important;background:#fff;}.tab-content{min-height:150px;padding:10px 0;color:#333 !important;}.tab-content table th{color:#333 !important;}.tab-content table td{color:#333 !important;}</style> <a href='https://github.com/Raptor-zip/LINGUAPORTA/' class='bookmark source'><div class='bookmark-info'><div class='bookmark-text'><div class='bookmark-title'>《使い方》リンガポルタ自動化ツール</div></div><div class='bookmark-href'><img src='https://github.com/fluidicon.png' class='icon bookmark-icon'>https://github.com/Raptor-zip/LINGUAPORTA/</div></div></a>";
             // タブ機能の初期化
             setTimeout(function() {
                 document.querySelectorAll('.tab-button').forEach(button => {
@@ -163,6 +193,8 @@ chrome.storage.local.get(null, function (storageData) {
                 document.getElementById("gas_url").value = storageData.gas_url;
             }
             updateLoginSettings();
+            // 設定変更時にリアルタイムで値を更新するためのイベントリスナーを設定
+            // 各設定要素（スライダー、チェックボックス、スイッチ）の変更を監視
             const settingElements = Object.freeze(["slider_score", "slider_late", "slider_correct_answer_rate", "unit_selection_0", "unit_selection_1", "switch", "gas_url"]);
             for (let i = 0; i < settingElements.length; i++) {
                 document.getElementById(settingElements[i]).addEventListener("change", updateLoginSettings);
@@ -215,6 +247,7 @@ chrome.storage.local.get(null, function (storageData) {
                         } else {
                             requestParams.append("paging_size", "50");
                         }
+                        // リンガポルタの単元一覧APIにリクエストを送信
                         let response = await fetch(unitsApiUrl, {
                             method: "POST",
                             body: requestParams,
@@ -225,46 +258,58 @@ chrome.storage.local.get(null, function (storageData) {
                         if (!response.ok) {
                             throw new Error("HTTP error! status: " + response.status);
                         }
+                        // APIレスポンスをHTMLとしてページに埋め込み
                         let responseText = await response.text();
                         document.getElementById("units_list").innerHTML = responseText;
                         let unitTableRows = document.getElementsByTagName("table")[0].rows;
                         let foundRunnableQuestion = false;
+                        // 単元一覧テーブルから実行可能な単元を検索
                         for (let i = 1; i < unitTableRows.length; i++) {
                             const cells = unitTableRows[i].cells;
+                            // テーブルの各行から単元情報を抽出
+                            // 例: "(1-25)空所補充" から開始番号1、終了番号25を取得
                             let unitInfo = {
-                                unit_name: cells[0].textContent.trim(),
-                                start_question_number: Number(cells[0].textContent.trim().split("-")[0].slice(1)),
-                                end_question_number: Number(cells[0].textContent.trim().split("-")[1].split(")")[0]),
-                                score: Number(cells[1].textContent.trim().split("点")[0]),
-                                button_onclick: cells[3].children[0].getAttribute("onclick")
+                                unit_name: cells[0].textContent.trim(), // 単元名: "(1-25)空所補充"
+                                start_question_number: Number(cells[0].textContent.trim().split("-")[0].slice(1)), // 開始問題番号: 1
+                                end_question_number: Number(cells[0].textContent.trim().split("-")[1].split(")")[0]), // 終了問題番号: 25
+                                score: Number(cells[1].textContent.trim().split("点")[0]), // 獲得可能スコア
+                                button_onclick: cells[3].children[0].getAttribute("onclick") // 開始ボタンのクリック属性
                             };
+                            // 開始ボタンが有効な場合（学習可能な単元）
                             if (unitInfo.button_onclick) {
                                 foundRunnableQuestion = true;
+                                // 単元内の全問題番号をリストに追加
                                 for (let j = unitInfo.start_question_number; j < unitInfo.end_question_number; j++) {
                                     questionNumberList.push(j);
                                 }
+                                // 単元名から種類を抽出("空所補充"または"単語の意味")
                                 const unitName = unitInfo.unit_name.split(")")[1];
+                                // GASサーバーに問題データをリクエスト
                                 const message = {
                                     request_type: "get",
                                     question_number: questionNumberList
                                 };
+                                // background.js経由でGASサーバーにメッセージ送信
                                 chrome.runtime.sendMessage(message, response => {
                                     console.debug(JSON.stringify(response));
                                     if (response != undefined) {
+                                        // 学習進捗情報を更新
                                         const newScorePerMode = {
                                             ...storageData.score_per_mode
                                         };
                                         newScorePerMode[unitName] = unitInfo.start_question_number;
                                         let updatedScorePerMode = newScorePerMode;
+                                        // 新しい学習セッションの初期データを作成
                                         let newStorageData = {
-                                            start_question_number: unitInfo.start_question_number,
-                                            start_time: Date.now(),
-                                            correct_answer_times: 0,
-                                            incorrect_answer_times: 0,
-                                            wrong_question_queue: storageData.set_wrong_question,
-                                            score_per_mode: updatedScorePerMode
+                                            start_question_number: unitInfo.start_question_number, // 開始問題番号
+                                            start_time: Date.now(),                               // 学習開始時刻
+                                            correct_answer_times: 0,                             // 正解数カウンター
+                                            incorrect_answer_times: 0,                           // 不正解数カウンター
+                                            wrong_question_queue: storageData.set_wrong_question, // 意図的に間違える問題キュー
+                                            score_per_mode: updatedScorePerMode                  // 各モードの進捗状況
                                         };
                                         console.log(response)
+                                        // GASサーバーから取得した問題データをストレージに保存
                                         response.content.forEach((questionData, index) => {
                                             newStorageData["a" + questionData[0]] = questionData.slice(1, 6);
                                         });
@@ -310,9 +355,12 @@ chrome.storage.local.get(null, function (storageData) {
         case "空所補充-問題出題画面":
             console.debug("location:" + currentPage);
             if (storageData.set_score > 0) {
+                // ユーザーに表示するメッセージ要素を作成
                 let messageDiv = document.createElement("div");
                 messageDiv.innerHTML = "<div id='false_msg' class='problem-mark-ng'><i class='las la-times'></i>" + storageData.set_late / 1000 + "秒後に不正解になります。</div>";
+                // 現在の問題を意図的に間違えるか判定
                 if (storageData.wrong_question_queue.includes(currentScore + 1)) {
+                    // 意図的に間違い回答を入力
                     document.getElementById("tabindex1").value = generateRandomString();
                     document.getElementById("under_area").before(messageDiv);
                     submitAnswer();
@@ -348,13 +396,21 @@ chrome.storage.local.get(null, function (storageData) {
             }
             break;
         case "空所補充-正解表示画面":
+            // 空所補充-正解表示画面の処理
             console.debug("location:" + currentPage);
+            // 問題番号キーを生成
             key = "a" + String(questionNumber);
+            // 入力欄から解答テキストを取得
             answerText1 = document.querySelector("#question_area > div.qu03 > input[type=text]").value.trim();
-            answerData = key in storageData ? [storageData[key][0], storageData[key][1], answerText1, storageData[key][3], storageData[key][4]] : [null, null, answerText1, null, null];
+            // 既存ストレージデータがあればそれを使い、なければ初期値で配列を作成
+            answerData = key in storageData
+                        ? [storageData[key][0], null, answerText1, storageData[key][3], storageData[key][4]]
+                        : [null, null, answerText1, null, null];
+            // 保存用オブジェクトを作成
             const dataToSet = {
                 [key]: answerData
             };
+            // Chromeストレージに保存し、保存後に次の問題へ進む
             chrome.storage.local.set(dataToSet, function () {
                 if (storageData.set_score > -1 && ALLOW_PAGE_TRANSLATION) {
                     document.getElementsByClassName("button button-success button-next-problem")[0].click();
@@ -381,8 +437,10 @@ chrome.storage.local.get(null, function (storageData) {
                     question_answer_1: document.querySelector("#drill_form > b").innerText.slice(1, -1),
                     question_answer_2: null
                 };
+                // GAS_set_queueが存在する場合はバッファに追加し、4件ごとにGASサーバーへ送信
                 if ("GAS_set_queue" in storageData) {
                     if (storageData.GAS_set_queue.length > 3) {
+                        // 4件以上溜まったら送信してバッファをクリア
                         chrome.storage.local.set({
                             GAS_set_queue: [],
                             correct_answer_times: storageData.correct_answer_times + 1
@@ -393,12 +451,15 @@ chrome.storage.local.get(null, function (storageData) {
                                 request_type: "set",
                                 content: newQueue
                             };
+                            // GASサーバーに送信
+                            console.log(message.content)
                             chrome.runtime.sendMessage(message, response => {
                                 console.debug(JSON.stringify(response));
                             });
                             proceedToNextStep();
                         });
                     } else {
+                        // バッファに追加のみ
                         let newQueue = storageData.GAS_set_queue;
                         newQueue.push(thisQuestionInfo);
                         chrome.storage.local.set({
@@ -409,6 +470,7 @@ chrome.storage.local.get(null, function (storageData) {
                         });
                     }
                 } else {
+                    // 初回は配列を作成
                     chrome.storage.local.set({
                         GAS_set_queue: [thisQuestionInfo],
                         correct_answer_times: storageData.correct_answer_times + 1
@@ -469,7 +531,9 @@ chrome.storage.local.get(null, function (storageData) {
             key = "a" + String(questionNumber);
             answerText1 = document.getElementById("qu02").innerText;
             answerText2 = document.getElementById("drill_form").innerText.slice(3, -2);
-            answerData = key in storageData ? [answerText1, answerText2, storageData[key][2], storageData[key][3], storageData[key][4]] : [answerText1, answerText2, null, null, null];
+            answerData = key in storageData 
+                        ? [answerText1, answerText2, storageData[key][2], storageData[key][3], storageData[key][4]] 
+                        : [answerText1, answerText2, null, null, null];
             const dataToSet2 = {
                 [key]: answerData
             };
@@ -499,8 +563,10 @@ chrome.storage.local.get(null, function (storageData) {
                     question_answer_1: document.getElementById("qu02").innerText,
                     question_answer_2: document.getElementById("drill_form").innerText.slice(4, -2)
                 };
+                // GAS_set_queueが存在する場合はバッファに追加し、8件ごとにGASサーバーへ送信
                 if ("GAS_set_queue" in storageData) {
                     if (storageData.GAS_set_queue.length > 7) {
+                        // 8件以上溜まったら送信してバッファをクリア
                         chrome.storage.local.set({
                             GAS_set_queue: [],
                             correct_answer_times: storageData.correct_answer_times + 1
@@ -511,12 +577,15 @@ chrome.storage.local.get(null, function (storageData) {
                                 request_type: "set",
                                 content: newQueue
                             };
+                            // GASサーバーに送信
+                            console.log(message)
                             chrome.runtime.sendMessage(message, response => {
                                 console.debug(JSON.stringify(response));
                             });
                             proceedToNextStep2();
                         });
                     } else {
+                        // バッファに追加のみ
                         let newQueue = storageData.GAS_set_queue;
                         newQueue.push(thisQuestionInfo2);
                         chrome.storage.local.set({
@@ -527,6 +596,7 @@ chrome.storage.local.get(null, function (storageData) {
                         });
                     }
                 } else {
+                    // 初回は配列を作成
                     chrome.storage.local.set({
                         GAS_set_queue: [thisQuestionInfo2],
                         correct_answer_times: storageData.correct_answer_times + 1
