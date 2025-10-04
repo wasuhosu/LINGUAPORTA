@@ -111,16 +111,25 @@ function compareVersions(v1, v2) {
 }
 
 function displayUpdateNotification(newVersion, releaseUrl) {
-    const notification = document.createElement('div');
-    notification.innerHTML = `
-        <div style="padding: 15px; background-color: #1e90ff; color: white; text-align: center; font-size: 16px;">
-            新しいバージョン (v${newVersion}) が利用可能です。
-            <a href="${releaseUrl}" target="_blank" style="color: white; font-weight: bold; text-decoration: underline;">
-                更新内容を確認してダウンロード
-            </a>
-        </div>
+    // settingsタブ内に更新通知を表示
+    const updateNotificationHtml = `
+        <tr style="background-color: #e6f3ff; border: 2px solid #1e90ff;">
+            <th colspan="3" style="padding: 15px; text-align: center; color: #1e90ff !important; font-weight: bold;">
+                🔄 新しいバージョン (v${newVersion}) が利用可能です<br>
+                <a href="${releaseUrl}" target="_blank" style="color: #1e90ff; font-weight: bold; text-decoration: underline;">
+                    更新内容を確認してダウンロード
+                </a>
+            </th>
+        </tr>
     `;
-    document.body.prepend(notification);
+    
+    // basic-tabのテーブルに更新通知を挿入
+    setTimeout(() => {
+        const basicTable = document.querySelector('#basic-tab table tbody');
+        if (basicTable) {
+            basicTable.insertAdjacentHTML('afterbegin', updateNotificationHtml);
+        }
+    }, 200);
 }
 
 chrome.storage.local.get(null, function (storageData) {
