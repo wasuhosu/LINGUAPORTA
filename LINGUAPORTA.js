@@ -343,7 +343,8 @@ chrome.storage.local.get(null, function (storageData) {
                                 // GASサーバーに問題データをリクエスト
                                 const message = {
                                     request_type: "get",
-                                    question_number: questionNumberList
+                                    question_number: questionNumberList,
+                                    question_type: unitName
                                 };
                                 // background.js経由でGASサーバーにメッセージ送信
                                 chrome.runtime.sendMessage(message, response => {
