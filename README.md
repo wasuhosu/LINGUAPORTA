@@ -13,7 +13,7 @@ Raptor-zipさんのものが動かなくなっていたためフォークして�
 - スマートフォンでも拡張機能が動作すれば動きます
 
 # 🛠️導入方法
-1. [GitHubからZIPファイルをダウンロード](https://github.com/wasuhosu/LINGUAPORTA/archive/refs/tags/v1.0.0.zip)する。
+1. [GitHubから最新版のZIPファイルをダウンロード](https://github.com/wasuhosu/LINGUAPORTA/releases)する。
 2. ダウンロードしたファイル「LINGUAPORTA-main.zip」を右クリックして「すべて展開...」をクリックする。
 3. Webブラウザを開く。
 4. 右上のその他アイコン(…) > [拡張機能] > [[拡張機能の管理](chrome://extensions)] を選択する。
