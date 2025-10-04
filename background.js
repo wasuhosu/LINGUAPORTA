@@ -1,5 +1,5 @@
 // デフォルトのGAS URL
-const defaultGasUrl = "https://script.google.com/macros/s/AKfycbxt1PoqleHz83NdYUjeLrMSkp0zbQaOCfq4QOemdjKoCiiVzQiuOhkj0OeoSKul4PP_yg/exec";
+const defaultGasUrl = "https://script.google.com/macros/s/AKfycbzt9E7IMfXDy-tqPejjKyQgtytEi4YuXVRS9I7nuDPWut3zprueHne9k3s7lUXPl4DctA/exec";
 
 // 拡張機能インストール時の初期設定
 chrome.runtime.onInstalled.addListener(function(details) {

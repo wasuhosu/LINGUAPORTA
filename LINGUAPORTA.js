@@ -9,7 +9,7 @@ if (ALLOW_PAGE_TRANSLATION == 0) {
 chrome.storage.local.get(['gas_url'], function(result) {
     if (!result.gas_url) {
         chrome.storage.local.set({
-            gas_url: "https://script.google.com/macros/s/AKfycbxt1PoqleHz83NdYUjeLrMSkp0zbQaOCfq4QOemdjKoCiiVzQiuOhkj0OeoSKul4PP_yg/exec"
+            gas_url: "https://script.google.com/macros/s/AKfycbzt9E7IMfXDy-tqPejjKyQgtytEi4YuXVRS9I7nuDPWut3zprueHne9k3s7lUXPl4DctA/exec"
         });
     }
 });
@@ -79,12 +79,10 @@ function getCurrentPageInfo() {
 }
 
 chrome.storage.local.get(null, function (storageData) {
-    console.debug(JSON.stringify(storageData));
     if (storageData.id == null && document.body.className != "page-login") {
         console.error("idが設定されていません");
         performLogout();
     }
-    console.log(storageData.wrong_question_queue)
     // ページ情報を取得
     const pageInfo = getCurrentPageInfo();
     let currentPage = pageInfo.currentPage;
@@ -97,16 +95,12 @@ chrome.storage.local.get(null, function (storageData) {
         // ページタイトル「(1-25)空所補充」から「1」を抽出し、開始番号として加算
         // 結果：実際の問題番号 = (画面上の問題番号 - 1) + 単元開始番号
         questionNumber = document.getElementsByClassName("problem-title")[0].innerText.split("：")[1] - 1 + Number(document.getElementsByClassName("page-title")[0].children[0].innerText.split(")")[0].slice(1).split("-")[0]);
-        console.log("questionNumber", questionNumber);
     }
     let currentScore = 0;
     if (document.getElementsByClassName("score-number")[1] != null) {
         currentScore = Number(document.getElementsByClassName("score-number")[1].innerText);
     }
     let questionNumberList = [];
-    let answerText1 = "";
-    let answerText2 = "";
-    let answerData = "";
     if (document.getElementById("question_td") != null) {
         document.getElementById("question_td").innerHTML = document.getElementById("question_td").innerHTML.replace(/<br>/g, "");
     }
@@ -308,9 +302,8 @@ chrome.storage.local.get(null, function (storageData) {
                                             wrong_question_queue: storageData.set_wrong_question, // 意図的に間違える問題キュー
                                             score_per_mode: updatedScorePerMode                  // 各モードの進捗状況
                                         };
-                                        console.log(response)
                                         // GASサーバーから取得した問題データをストレージに保存
-                                        response.content.forEach((questionData, index) => {
+                                        response.content.forEach((questionData) => {
                                             newStorageData["a" + questionData[0]] = questionData.slice(1, 6);
                                         });
                                         chrome.storage.local.set(newStorageData, function () {
@@ -360,14 +353,13 @@ chrome.storage.local.get(null, function (storageData) {
                 messageDiv.innerHTML = "<div id='false_msg' class='problem-mark-ng'><i class='las la-times'></i>" + storageData.set_late / 1000 + "秒後に不正解になります。</div>";
                 // 現在の問題を意図的に間違えるか判定
                 if (storageData.wrong_question_queue.includes(currentScore + 1)) {
-                    // 意図的に間違い回答を入力
                     document.getElementById("tabindex1").value = generateRandomString();
                     document.getElementById("under_area").before(messageDiv);
                     submitAnswer();
                 } else {
-                    key = "a" + String(questionNumber);
-                    if ([key] in storageData && storageData[key][2] != null && storageData[key][2] != "") {
-                        document.getElementById("tabindex1").value = storageData[key][2];
+                    let key1 = "a" + String(questionNumber);
+                    if ([key1] in storageData && storageData[key1][2] != null && storageData[key1][2] != "") {
+                        document.getElementById("tabindex1").value = storageData[key1][2];
                         messageDiv.innerHTML = "<div id='true_msg' class='problem-mark-ok'><i class='las la-check-circle'></i>" + storageData.set_late / 1000 + "秒後に正解します。</div>";
                         document.getElementById("under_area").before(messageDiv);
                     } else {
@@ -398,20 +390,16 @@ chrome.storage.local.get(null, function (storageData) {
         case "空所補充-正解表示画面":
             // 空所補充-正解表示画面の処理
             console.debug("location:" + currentPage);
-            // 問題番号キーを生成
-            key = "a" + String(questionNumber);
-            // 入力欄から解答テキストを取得
-            answerText1 = document.querySelector("#question_area > div.qu03 > input[type=text]").value.trim();
-            // 既存ストレージデータがあればそれを使い、なければ初期値で配列を作成
-            answerData = key in storageData
-                        ? [storageData[key][0], null, answerText1, storageData[key][3], storageData[key][4]]
+            // 問題番号キーを生成（空所補充はkey1_）
+            let key1 = "a" + String(questionNumber);
+            let answerText1 = document.querySelector("#question_area > div.qu03 > input[type=text]").value.trim();
+            let answerData = key1 in storageData
+                        ? [storageData[key1][0], null, answerText1, storageData[key1][3], storageData[key1][4]]
                         : [null, null, answerText1, null, null];
-            // 保存用オブジェクトを作成
-            const dataToSet = {
-                [key]: answerData
+            const dataToSet1 = {
+                [key1]: answerData
             };
-            // Chromeストレージに保存し、保存後に次の問題へ進む
-            chrome.storage.local.set(dataToSet, function () {
+            chrome.storage.local.set(dataToSet1, function () {
                 if (storageData.set_score > -1 && ALLOW_PAGE_TRANSLATION) {
                     document.getElementsByClassName("button button-success button-next-problem")[0].click();
                 }
@@ -421,8 +409,8 @@ chrome.storage.local.get(null, function (storageData) {
         case "空所補充-全問題終了画面":
             console.debug("location:" + currentPage);
             if (storageData.set_score > -2) {
-                function proceedToNextStep() {
-                    console.log("this_question_info", thisQuestionInfo);
+                function proceedToNextStepForFillBlank() {
+                    console.log("this_question_info", thisQuestionInfoForFillBlank);
                     if (ALLOW_PAGE_TRANSLATION) {
                         if (currentPage === "空所補充-正解後の画面") {
                             document.getElementsByClassName("button button-success button-next-problem")[0].click();
@@ -431,7 +419,7 @@ chrome.storage.local.get(null, function (storageData) {
                         }
                     }
                 }
-                let thisQuestionInfo = {
+                let thisQuestionInfoForFillBlank = {
                     question_number: questionNumber,
                     question_type: questionType,
                     question_answer_1: document.querySelector("#drill_form > b").innerText.slice(1, -1),
@@ -446,7 +434,7 @@ chrome.storage.local.get(null, function (storageData) {
                             correct_answer_times: storageData.correct_answer_times + 1
                         }, function () {
                             let newQueue = storageData.GAS_set_queue;
-                            newQueue.push(thisQuestionInfo);
+                            newQueue.push(thisQuestionInfoForFillBlank);
                             const message = {
                                 request_type: "set",
                                 content: newQueue
@@ -456,26 +444,26 @@ chrome.storage.local.get(null, function (storageData) {
                             chrome.runtime.sendMessage(message, response => {
                                 console.debug(JSON.stringify(response));
                             });
-                            proceedToNextStep();
+                            proceedToNextStepForFillBlank();
                         });
                     } else {
                         // バッファに追加のみ
                         let newQueue = storageData.GAS_set_queue;
-                        newQueue.push(thisQuestionInfo);
+                        newQueue.push(thisQuestionInfoForFillBlank);
                         chrome.storage.local.set({
                             GAS_set_queue: newQueue,
                             correct_answer_times: storageData.correct_answer_times + 1
                         }, function () {
-                            proceedToNextStep();
+                            proceedToNextStepForFillBlank();
                         });
                     }
                 } else {
                     // 初回は配列を作成
                     chrome.storage.local.set({
-                        GAS_set_queue: [thisQuestionInfo],
+                        GAS_set_queue: [thisQuestionInfoForFillBlank],
                         correct_answer_times: storageData.correct_answer_times + 1
                     }, function () {
-                        proceedToNextStep();
+                        proceedToNextStepForFillBlank();
                     });
                 }
             }
@@ -486,21 +474,21 @@ chrome.storage.local.get(null, function (storageData) {
                 let messageDiv = document.createElement("div");
                 messageDiv.innerHTML = "<div id='false_msg' class='problem-mark-ng'><i class='las la-times'></i>" + storageData.set_late / 1000 + "秒後に不正解になります。</div>";
                 if (storageData.wrong_question_queue !== undefined) {
-                    let checkedIndex = 0;
+                    let checkedIndex2 = 0;
                     if (!storageData.wrong_question_queue.includes(currentScore + 1)) {
-                        key = "a" + String(questionNumber);
-                        if (storageData[key] && storageData[key][1]) {
-                            let answerOptions = Array.from({
+                        let key2 = "a2_" + String(questionNumber);
+                        if (storageData[key2] && storageData[key2][1]) {
+                            let answerOptions2 = Array.from({
                                 length: 5
                             }, (v, i) => document.getElementById("answer_0_" + i).value);
-                            let correctIndex = answerOptions.indexOf(storageData[key][1]);
-                            if (correctIndex !== -1) {
-                                checkedIndex = correctIndex;
+                            let correctIndex2 = answerOptions2.indexOf(storageData[key2][1]);
+                            if (correctIndex2 !== -1) {
+                                checkedIndex2 = correctIndex2;
                                 messageDiv.innerHTML = "<div id='true_msg' class='problem-mark-ok'><i class='las la-check-circle'></i>" + storageData.set_late / 1000 + "秒後に正解します。</div>";
                             }
                         }
                     }
-                    document.getElementById("answer_0_" + checkedIndex).checked = true;
+                    document.getElementById("answer_0_" + checkedIndex2).checked = true;
                     document.getElementById("under_area").before(messageDiv);
                     submitAnswer();
                 } else {
@@ -528,14 +516,14 @@ chrome.storage.local.get(null, function (storageData) {
             break;
         case "単語の意味-正解表示画面":
             console.debug("location:" + currentPage);
-            key = "a" + String(questionNumber);
-            answerText1 = document.getElementById("qu02").innerText;
-            answerText2 = document.getElementById("drill_form").innerText.slice(3, -2);
-            answerData = key in storageData 
-                        ? [answerText1, answerText2, storageData[key][2], storageData[key][3], storageData[key][4]] 
-                        : [answerText1, answerText2, null, null, null];
+            let key2 = "a" + String(questionNumber);
+            let answerText1_word = document.getElementById("qu02").innerText;
+            let answerText2_word = document.getElementById("drill_form").innerText.slice(3, -2);
+            let answerData_word = key2 in storageData 
+                        ? [answerText1_word, answerText2_word, storageData[key2][2], storageData[key2][3], storageData[key2][4]] 
+                        : [answerText1_word, answerText2_word, null, null, null];
             const dataToSet2 = {
-                [key]: answerData
+                [key2]: answerData_word
             };
             chrome.storage.local.set(dataToSet2, function () {
                 if (storageData.set_score > -1 && ALLOW_PAGE_TRANSLATION) {
@@ -547,8 +535,8 @@ chrome.storage.local.get(null, function (storageData) {
         case "単語の意味-全問題終了画面":
             console.debug("location:" + currentPage);
             if (storageData.set_score > -2) {
-                function proceedToNextStep2() {
-                    console.log("this_question_info", thisQuestionInfo2);
+                function proceedToNextStepForWordMeaning() {
+                    console.log("this_question_info", thisQuestionInfoForWordMeaning);
                     if (ALLOW_PAGE_TRANSLATION) {
                         if (currentPage === "単語の意味-正解後の画面") {
                             document.getElementsByClassName("button button-success button-next-problem")[0].click();
@@ -557,22 +545,22 @@ chrome.storage.local.get(null, function (storageData) {
                         }
                     }
                 }
-                let thisQuestionInfo2 = {
+                let thisQuestionInfoForWordMeaning = {
                     question_number: questionNumber,
                     question_type: questionType,
                     question_answer_1: document.getElementById("qu02").innerText,
                     question_answer_2: document.getElementById("drill_form").innerText.slice(4, -2)
                 };
-                // GAS_set_queueが存在する場合はバッファに追加し、8件ごとにGASサーバーへ送信
+                // GAS_set_queueが存在する場合はバッファに追加し、4件ごとにGASサーバーへ送信
                 if ("GAS_set_queue" in storageData) {
-                    if (storageData.GAS_set_queue.length > 7) {
-                        // 8件以上溜まったら送信してバッファをクリア
+                    if (storageData.GAS_set_queue.length > 3) {
+                        // 4件以上溜まったら送信してバッファをクリア
                         chrome.storage.local.set({
                             GAS_set_queue: [],
                             correct_answer_times: storageData.correct_answer_times + 1
                         }, function () {
                             let newQueue = storageData.GAS_set_queue;
-                            newQueue.push(thisQuestionInfo2);
+                            newQueue.push(thisQuestionInfoForWordMeaning);
                             const message = {
                                 request_type: "set",
                                 content: newQueue
@@ -582,26 +570,26 @@ chrome.storage.local.get(null, function (storageData) {
                             chrome.runtime.sendMessage(message, response => {
                                 console.debug(JSON.stringify(response));
                             });
-                            proceedToNextStep2();
+                            proceedToNextStepForWordMeaning();
                         });
                     } else {
                         // バッファに追加のみ
                         let newQueue = storageData.GAS_set_queue;
-                        newQueue.push(thisQuestionInfo2);
+                        newQueue.push(thisQuestionInfoForWordMeaning);
                         chrome.storage.local.set({
                             GAS_set_queue: newQueue,
                             correct_answer_times: storageData.correct_answer_times + 1
                         }, function () {
-                            proceedToNextStep2();
+                            proceedToNextStepForWordMeaning();
                         });
                     }
                 } else {
                     // 初回は配列を作成
                     chrome.storage.local.set({
-                        GAS_set_queue: [thisQuestionInfo2],
+                        GAS_set_queue: [thisQuestionInfoForWordMeaning],
                         correct_answer_times: storageData.correct_answer_times + 1
                     }, function () {
-                        proceedToNextStep2();
+                        proceedToNextStepForWordMeaning();
                     });
                 }
             }
