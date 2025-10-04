@@ -539,7 +539,7 @@ chrome.storage.local.get(null, function (storageData) {
                 if (storageData.wrong_question_queue !== undefined) {
                     let checkedIndex2 = 0;
                     if (!storageData.wrong_question_queue.includes(currentScore + 1)) {
-                        let key2 = "a2_" + String(questionNumber);
+                        let key2 = "a" + String(questionNumber);
                         if (storageData[key2] && storageData[key2][1]) {
                             let answerOptions2 = Array.from({
                                 length: 5
