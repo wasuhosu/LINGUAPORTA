@@ -9,7 +9,7 @@ if (ALLOW_PAGE_TRANSLATION == 0) {
 chrome.storage.local.get(['gas_url'], function(result) {
     if (!result.gas_url) {
         chrome.storage.local.set({
-            gas_url: "https://script.google.com/macros/s/AKfycbzt9E7IMfXDy-tqPejjKyQgtytEi4YuXVRS9I7nuDPWut3zprueHne9k3s7lUXPl4DctA/exec"
+            gas_url: "https://script.google.com/macros/s/AKfycbwUXUzqjD9nr41V-Dr30Be-CzndTOVu2LPJuKycwgidqpzBT0M3OQ5FhqDrv7kKHYuvNg/exec"
         });
     }
 });
