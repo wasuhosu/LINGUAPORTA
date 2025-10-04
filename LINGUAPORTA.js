@@ -78,6 +78,51 @@ function getCurrentPageInfo() {
     };
 }
 
+function checkForUpdates() {
+    const repo = "wasuhosu/LINGUAPORTA";
+    const latestReleaseUrl = `https://api.github.com/repos/${repo}/releases/latest`;
+
+    fetch(latestReleaseUrl)
+        .then(response => response.json())
+        .then(data => {
+            const latestVersion = data.tag_name.replace('v', '');
+            const currentVersion = chrome.runtime.getManifest().version;
+
+            // バージョンを比較し、新しいバージョンがあれば通知を表示
+            if (compareVersions(latestVersion, currentVersion) > 0) {
+                displayUpdateNotification(latestVersion, data.html_url);
+            }
+        })
+        .catch(error => console.error('Error checking for updates:', error));
+}
+
+function compareVersions(v1, v2) {
+    const parts1 = v1.split('.').map(Number);
+    const parts2 = v2.split('.').map(Number);
+    const len = Math.max(parts1.length, parts2.length);
+
+    for (let i = 0; i < len; i++) {
+        const p1 = parts1[i] || 0;
+        const p2 = parts2[i] || 0;
+        if (p1 > p2) return 1;
+        if (p1 < p2) return -1;
+    }
+    return 0;
+}
+
+function displayUpdateNotification(newVersion, releaseUrl) {
+    const notification = document.createElement('div');
+    notification.innerHTML = `
+        <div style="padding: 15px; background-color: #1e90ff; color: white; text-align: center; font-size: 16px;">
+            新しいバージョン (v${newVersion}) が利用可能です。
+            <a href="${releaseUrl}" target="_blank" style="color: white; font-weight: bold; text-decoration: underline;">
+                更新内容を確認してダウンロード
+            </a>
+        </div>
+    `;
+    document.body.prepend(notification);
+}
+
 chrome.storage.local.get(null, function (storageData) {
     if (storageData.id == null && document.body.className != "page-login") {
         console.error("idが設定されていません");
@@ -107,13 +152,21 @@ chrome.storage.local.get(null, function (storageData) {
     switch (currentPage) {
         case "ログイン画面":
             console.debug("location:" + currentPage);
+            checkForUpdates();
             function updateLoginSettings() {
                 document.getElementById("current-value_late").innerText = document.getElementById("slider_late").value + "秒";
                 document.getElementById("current-value_score").innerText = document.getElementById("slider_score").value + "点";
                 document.getElementById("current-value_correct_answer_rate").innerText = document.getElementById("slider_correct_answer_rate").value + "%";
+                
+                // 学習時間の概算を計算・表示
+                let score = Number(document.getElementById("slider_score").value);
+                let delayTime = Number(document.getElementById("slider_late").value);
+                let correctRate = Number(document.getElementById("slider_correct_answer_rate").value) / 100;
+                let estimatedTime = Math.round(score * (delayTime + 3) * (1 / correctRate));
+                document.getElementById("estimated-time").innerText = Math.round(estimatedTime / 60) + "分";
+                
                 let questionsToFail = [];
-                let correctRate = Number(document.getElementById("slider_correct_answer_rate").value);
-                let incorrectRate = 100 - correctRate;
+                let incorrectRate = 100 - (correctRate * 100);
                 // 25問中の不正解数を計算
                 let incorrectCount = Math.round(25 * incorrectRate / 100);
                 // 不正解にする問題番号をランダムに選択
@@ -153,7 +206,7 @@ chrome.storage.local.get(null, function (storageData) {
             }
             // ログイン画面に自動化設定UIを埋め込み
             // 元のログインフォームを拡張して、自動化ON/OFF、スコア設定、遅延設定、正答率設定、単元選択を追加
-            document.getElementsByClassName("body")[0].innerHTML = "<form action='/user/seibido/' method='POST'><input type='hidden' name='login' value='login'><div class='login-error-block'></div><div class='input-with-icon login-input-text'><i class='las la-smile'></i><input type='text' name='id' autocomplete='username' placeholder='User ID'></div><div class='input-with-icon login-input-text'><i class='las la-key'></i><div class='password-wrapper'><input type='password' name='password' autocomplete='current-password' placeholder='Password'><button class='button button-trans passwdViewBtn' type='button'>表示</button></div></div><script>makePasswordVisible(document.querySelector('input[type=password]'));</script><div class='login-optx '><a href='resetpw.php'>パスワードを忘れた方&nbsp;<i class='las la-arrow-right'></i></a><a href='https://www.seibido.co.jp/linguaporta/register.html' target='_blank'>リンガポルタの使い方&nbsp;<i class='las la-arrow-right'></i></a></div><div class='center_RL'><label for='switch' class='switch_label'><div class='switch'><input type='checkbox' id='switch' checked /><div class='circle'></div> <div class='base'></div></div><span class='current-status'>OFF</span></label></div><div class='stats-pannel ranking'><div class='title'>SETTINGS</div><div class='body'><div class='tab-container'><div class='tab-buttons'><button type='button' class='tab-button active' data-tab='basic'>基本設定</button><button type='button' class='tab-button' data-tab='advanced'>詳細設定</button></div><div class='tab-content' id='basic-tab'><table id='table_setting' class='table_original'><tbody><tr id='tr_setting_score'><th style='width:7em;'>獲得するスコア</th><td id='current-value_score' class='current-value' style='width:3em; border-right:none;'></td><td><input type='range' id='slider_score' min='25' max='1500' step='25' value='100' style='width:100%' title='自動実行で獲得するスコアを選択します'></td></tr><tr id='tr_setting_late'><th>回答入力遅延</th><td id='current-value_late' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_late' min='0' max='20' step='1' value='8' style='width:100%' title='回答入力時の遅延を選択します(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr id='tr_setting_rate'><th>正答率</th><td id='current-value_correct_answer_rate' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_correct_answer_rate' min='0' max='100' step='1' value='80' style='width:100%' title='正答率を選択します(0-100%)(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr><th>単元</th><td colspan='2' style='text-align:left !important;'><label><input type='checkbox' id='unit_selection_0' name='unit_selection' value='単語の意味' title='単語の意味' checked>単語の意味</label><label><input type='checkbox' id='unit_selection_1' name='unit_selection' value='空所補充' title='空所補充' checked>空所補充</label></td></tr></tbody></table></div><div class='tab-content' id='advanced-tab' style='display:none;'><table class='table_original'><tbody><tr><th style='width:7em; color:#333 !important;'>GAS URL</th><td colspan='2'><input type='url' id='gas_url' placeholder='https://script.google.com/macros/s/.../exec' style='width:100%; padding:5px; border:1px solid #ccc; border-radius:3px; color:#333 !important;' title='Google Apps ScriptのWebアプリURLを入力してください'></td></tr><tr><td colspan='3' style='padding:10px; color:#666; font-size:12px; line-height:1.4;'>※ Google Apps ScriptのWebアプリURLを入力してください。<br>デフォルト値が設定されているため、通常は変更不要です。</td></tr></tbody></table></div></div></div></div><div class='login-btn'><button type='submit' value='LOGIN' class='button button-secondary button-big'>スタート</button></div></form><style>.tab-container{margin-top:10px;}.tab-buttons{display:flex;border-bottom:1px solid #ccc;margin-bottom:10px;}.tab-button{flex:1;padding:10px 16px;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;font-size:14px;color:#333 !important;transition:all 0.3s;}.tab-button:hover{background:#f5f5f5;color:#007cba !important;}.tab-button.active{border-bottom-color:#007cba;color:#007cba !important;background:#fff;}.tab-content{min-height:150px;padding:10px 0;color:#333 !important;}.tab-content table th{color:#333 !important;}.tab-content table td{color:#333 !important;}</style> <a href='https://github.com/Raptor-zip/LINGUAPORTA/' class='bookmark source'><div class='bookmark-info'><div class='bookmark-text'><div class='bookmark-title'>《使い方》リンガポルタ自動化ツール</div></div><div class='bookmark-href'><img src='https://github.com/fluidicon.png' class='icon bookmark-icon'>https://github.com/Raptor-zip/LINGUAPORTA/</div></div></a>";
+            document.getElementsByClassName("body")[0].innerHTML = "<form action='/user/seibido/' method='POST'><input type='hidden' name='login' value='login'><div class='login-error-block'></div><div class='input-with-icon login-input-text'><i class='las la-smile'></i><input type='text' name='id' autocomplete='username' placeholder='User ID'></div><div class='input-with-icon login-input-text'><i class='las la-key'></i><div class='password-wrapper'><input type='password' name='password' autocomplete='current-password' placeholder='Password'><button class='button button-trans passwdViewBtn' type='button'>表示</button></div></div><script>makePasswordVisible(document.querySelector('input[type=password]'));</script><div class='login-optx '><a href='resetpw.php'>パスワードを忘れた方&nbsp;<i class='las la-arrow-right'></i></a><a href='https://www.seibido.co.jp/linguaporta/register.html' target='_blank'>リンガポルタの使い方&nbsp;<i class='las la-arrow-right'></i></a></div><div class='center_RL'><label for='switch' class='switch_label'><div class='switch'><input type='checkbox' id='switch' checked /><div class='circle'></div> <div class='base'></div></div><span class='current-status'>OFF</span></label></div><div class='stats-pannel ranking'><div class='title'>SETTINGS</div><div class='body'><div class='tab-container'><div class='tab-buttons'><button type='button' class='tab-button active' data-tab='basic'>基本設定</button><button type='button' class='tab-button' data-tab='advanced'>詳細設定</button></div><div class='tab-content' id='basic-tab'><table id='table_setting' class='table_original'><tbody><tr id='tr_setting_score'><th style='width:7em;'>獲得するスコア</th><td id='current-value_score' class='current-value' style='width:3em; border-right:none;'></td><td><input type='range' id='slider_score' min='25' max='1500' step='25' value='100' style='width:100%' title='自動実行で獲得するスコアを選択します'></td></tr><tr id='tr_setting_late'><th>回答入力遅延</th><td id='current-value_late' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_late' min='0' max='20' step='1' value='8' style='width:100%' title='回答入力時の遅延を選択します(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr id='tr_setting_rate'><th>正答率</th><td id='current-value_correct_answer_rate' class='current-value' style='border-right:none;'></td><td><input type='range' id='slider_correct_answer_rate' min='0' max='100' step='1' value='80' style='width:100%' title='正答率を選択します(0-100%)(管理者に自動化ツールと判断されないようにするため)'></td></tr><tr><th>予想実行時間</th><td id='estimated-time' class='current-value' style='width:4em; border-right:none; color:#007cba !important; font-weight:bold; white-space:nowrap;'></td><td style='color:#666; font-size:12px;'>概算時間</td></tr><tr><th>単元</th><td colspan='2' style='text-align:left !important;'><label><input type='checkbox' id='unit_selection_0' name='unit_selection' value='単語の意味' title='単語の意味' checked>単語の意味</label><label><input type='checkbox' id='unit_selection_1' name='unit_selection' value='空所補充' title='空所補充' checked>空所補充</label></td></tr></tbody></table></div><div class='tab-content' id='advanced-tab' style='display:none;'><table class='table_original'><tbody><tr><th style='width:7em; color:#333 !important;'>GAS URL</th><td colspan='2'><input type='url' id='gas_url' placeholder='https://script.google.com/macros/s/.../exec' style='width:100%; padding:5px; border:1px solid #ccc; border-radius:3px; color:#333 !important;' title='Google Apps ScriptのWebアプリURLを入力してください'></td></tr><tr><td colspan='3' style='padding:10px; color:#666; font-size:12px; line-height:1.4;'>※ Google Apps ScriptのWebアプリURLを入力してください。<br>デフォルト値が設定されているため、通常は変更不要です。</td></tr></tbody></table></div></div></div></div><div class='login-btn'><button type='submit' value='LOGIN' class='button button-secondary button-big'>スタート</button></div></form><style>.tab-container{margin-top:10px;}.tab-buttons{display:flex;border-bottom:1px solid #ccc;margin-bottom:10px;}.tab-button{flex:1;padding:10px 16px;border:none;background:transparent;cursor:pointer;border-bottom:2px solid transparent;font-size:14px;color:#333 !important;transition:all 0.3s;}.tab-button:hover{background:#f5f5f5;color:#007cba !important;}.tab-button.active{border-bottom-color:#007cba;color:#007cba !important;background:#fff;}.tab-content{min-height:150px;padding:10px 0;color:#333 !important;}.tab-content table th{color:#333 !important;}.tab-content table td{color:#333 !important;}</style> <a href='https://github.com/Raptor-zip/LINGUAPORTA/' class='bookmark source'><div class='bookmark-info'><div class='bookmark-text'><div class='bookmark-title'>《使い方》リンガポルタ自動化ツール</div></div><div class='bookmark-href'><img src='https://github.com/fluidicon.png' class='icon bookmark-icon'>https://github.com/Raptor-zip/LINGUAPORTA/</div></div></a>";
             // タブ機能の初期化
             setTimeout(function() {
                 document.querySelectorAll('.tab-button').forEach(button => {
